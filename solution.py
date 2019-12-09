@@ -4,6 +4,8 @@ from tensorflow.keras.layers import Flatten
 from tensorflow.keras.layers import MaxPooling1D
 from tensorflow.keras.layers import Conv1D
 from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dropout
+
 from tensorflow.keras.optimizers import Adam
 import pandas as pd
 import os
@@ -26,7 +28,7 @@ def main():
     X = dataset.drop(['name', 'classification'], axis=1)
     y = dataset['classification']
 
-    epochs = 50
+    epochs = 20
 
     pd.DataFrame(X).fillna(0, inplace=True)
     pd.DataFrame(y).fillna(0, inplace=True)
@@ -39,7 +41,8 @@ def main():
     model = Sequential()
     model.add(Dense(32, activation='relu', input_shape=(24,)))
     model.add(Dense(16, activation='relu'))
-    #model.add(Dense(8, activation='relu'))
+    # model.add(Dropout(0.25))
+    model.add(Dense(8, activation='relu'))
     model.add(Dense(1, activation='sigmoid'))
     adam = Adam(learning_rate=.01)
     model.compile(optimizer=adam,
@@ -53,9 +56,8 @@ def main():
     # evaluate model
     accuracy = model.evaluate(X_test, y_test)
 
-    print(model.summary())
+    print(model.layers[3].get_weights())
 
-    # [True Negative
     # Confusion matrix
     y_pred = model.predict(X_test)
     y_pred = (y_pred > 0.5)
