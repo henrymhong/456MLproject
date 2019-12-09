@@ -1,75 +1,94 @@
-import os
-import pandas as pd
-import numpy as np
 import tensorflow as tf
-# REMOVE tensorflow. if not working for keras imports
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv1D
-from tensorflow.keras.layers import MaxPooling1D
-from tensorflow.keras.layers import Flatten
 from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import MaxPooling1D
+from tensorflow.keras.layers import Conv1D
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.optimizers import Adam
+import pandas as pd
+import os
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
 
-from keras.utils import to_categorical
-
-
+# For pydot model
 os.environ["PATH"] += os.pathsep + 'C:/Program Files (x86)/Graphviz2.38/bin/'
 
 
-def solution():
+def main():
 
     # Load data
-    testData = pd.read_csv("./data/test_data.csv")
-    trainData = pd.read_csv("./data/test_data.csv")
+    dataset = pd.read_csv("data.txt")
+    dataset.columns = ['name', 'games', 'games_started', 'minutes_played',
+                       'field_goals', 'field_goals_attempted', 'field_goal_percent', 'two_pointers', 'two_pointers_attempted', 'two_pointers_percent', 'three_pointers',
+                       'three_pointers_attempted', 'three_pointers_percent', 'free_throws', 'free_throws_attempted', 'free_throws_percent', 'offensive_rebounds',
+                       'defensive_rebounds', 'total_rebounds', 'assists', 'steals', 'blocks', 'turn_overs', 'personal_fouls', 'points', 'classification', ]
+    X = dataset.drop(['name', 'classification'], axis=1)
+    y = dataset['classification']
 
-    # Adjust data
-    testLabel = testData.pop("label").to_numpy()
-    trainLabel = trainData.pop("label").to_numpy()
-    testData = testData.to_numpy()
-    trainData = trainData.to_numpy()
+    epochs = 50
 
-    for n in range(len(testLabel)):
-        if testLabel[n] == -1:
-            testLabel[n] = 0
+    pd.DataFrame(X).fillna(0, inplace=True)
+    pd.DataFrame(y).fillna(0, inplace=True)
 
-    for n in range(len(trainLabel)):
-        if trainLabel[n] == -1:
-            trainLabel[n] = 0
+    print("Data entries (rows):", X.shape[0])
+    print("Features (columns):", X.shape[1])
 
-    print("Accuracy: ", evaluate_model(trainData,
-                                       trainLabel, testData, testLabel))
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
 
-
-def evaluate_model(trainX, trainy, testX, testy):
-    trainX = np.expand_dims(trainX, axis=2)
-    trainy = np.expand_dims(trainy, axis=2)
-    testX = np.expand_dims(testX, axis=2)
-
-    trainy = to_categorical(trainy)
-    testy = to_categorical(testy)
-
-    verbose, epochs, batch_size = 0, 10, 32
-    n_timesteps, n_features, n_outputs = trainX.shape[1], trainX.shape[2], trainy.shape[1]
     model = Sequential()
-    model.add(Conv1D(filters=64, kernel_size=3, activation='relu',
-                     input_shape=(n_timesteps, n_features)))
-    model.add(Conv1D(filters=64, kernel_size=3, activation='relu'))
-    model.add(MaxPooling1D(pool_size=2))
-    model.add(Flatten())
-    model.add(Dense(100, activation='relu'))
-    model.add(Dense(n_outputs, activation='softmax'))
-    model.compile(loss='categorical_crossentropy',
-                  optimizer='adam', metrics=['accuracy'])
+    model.add(Dense(32, activation='relu', input_shape=(24,)))
+    model.add(Dense(16, activation='relu'))
+    #model.add(Dense(8, activation='relu'))
+    model.add(Dense(1, activation='sigmoid'))
+    adam = Adam(learning_rate=.01)
+    model.compile(optimizer=adam,
+                  loss='binary_crossentropy', metrics=['accuracy'])
+
     # fit network
-    model.fit(trainX, trainy, epochs=epochs,
-              batch_size=batch_size, verbose=verbose)
+    history = model.fit(X_train, y_train, epochs=epochs,
+                        shuffle=True, validation_split=0.25)
+    # history = model.fit(X_train, y_train, epochs=10)
+
     # evaluate model
-    _, accuracy = model.evaluate(
-        testX, testy, batch_size=batch_size, verbose=0)
+    accuracy = model.evaluate(X_test, y_test)
 
-    # create model png
-    tf.keras.utils.plot_model(model, to_file='model_plot.png',
-                              show_shapes=True, show_layer_names=True)
-    return accuracy
+    print(model.summary())
+
+    # [True Negative
+    # Confusion matrix
+    y_pred = model.predict(X_test)
+    y_pred = (y_pred > 0.5)
+    cm = confusion_matrix(y_test, y_pred)
+
+    print("Epochs:", epochs)
+    print("Loss, Accuracy:", accuracy)
+    print("Confusion Matrix:\n", cm)
+    print("[True Negative | False Negatives]")
+    print("[False Positives | True Positives]")
+
+    # print(model.get_config())
+
+    # Create model.png
+    tf.keras.utils.plot_model(
+        model, to_file='model.png', show_shapes=True, show_layer_names=True, rankdir="LR", expand_nested=True)
+
+    # Plot training & validation accuracy values
+    plt.plot(history.history['accuracy'])
+    plt.plot(history.history['val_accuracy'])
+    plt.title('Model accuracy')
+    plt.ylabel('Accuracy')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Test'], loc='upper left')
+    # plt.show()
+
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('Model loss')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Test'], loc='upper left')
+    # plt.show()
 
 
-solution()
+main()
